@@ -23,8 +23,8 @@ export default function SettingsPage({ navigation }) {
       console.log('Loaded Settings:', { location, tempUnit, useCurrent }); 
   
       if (location) setDefaultLocation(location);
-      if (tempUnit !== null) setIsFahrenheit(JSON.parse(tempUnit));
-      if (useCurrent !== null) setUseCurrentLocation(JSON.parse(useCurrent));
+      if (tempUnit !== null) setIsFahrenheit(tempUnit === 'true');
+      if (useCurrent !== null) setUseCurrentLocation(useCurrent === 'true');
     } catch (error) {
       console.error('Fout bij laden instellingen', error);
     }

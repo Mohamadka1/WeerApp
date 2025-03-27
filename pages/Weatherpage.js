@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused } from '@react-navigation/native';
 
 const API_KEY = '09530c25e17cfe2cbdd923bad8aea322';
 
@@ -12,15 +13,17 @@ export default function WeatherPage() {
   const [isFahrenheit, setIsFahrenheit] = useState(false);
   const [useCurrentLocation, setUseCurrentLocation] = useState(false);
   const [defaultLocation, setDefaultLocation] = useState('');
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     const loadAndFetch = async () => {
-       loadSettings();
+      await loadSettings();
       fetchWeatherData();
     };
-  
-    loadAndFetch();
-  }, []);
+    if (isFocused) {
+      loadAndFetch();
+    }
+  }, [isFocused, useCurrentLocation, defaultLocation]);
 
   const loadSettings = async () => {
     try {
