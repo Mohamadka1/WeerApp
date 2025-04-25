@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, Switch, Button, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Switch,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Platform,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
@@ -14,110 +23,104 @@ export default function SettingsPage({ navigation }) {
     fetchCurrentLocation();
   }, []);
 
+  useEffect(() => {
+    if (useCurrentLocation) {
+      fetchCurrentLocation();
+    }
+  }, [useCurrentLocation]);
+
   const loadSettings = async () => {
     try {
-      const location = await AsyncStorage.getItem('defaultLocation');
-      const tempUnit = await AsyncStorage.getItem('isFahrenheit');
-      const useCurrent = await AsyncStorage.getItem('useCurrentLocation');
-      
-      console.log('Loaded Settings:', { location, tempUnit, useCurrent }); 
-  
-      if (location) setDefaultLocation(location);
-      if (tempUnit !== null) setIsFahrenheit(tempUnit === 'true');
-      if (useCurrent !== null) setUseCurrentLocation(useCurrent === 'true');
-    } catch (error) {
-      console.error('Fout bij laden instellingen', error);
+      const loc = await AsyncStorage.getItem('defaultLocation');
+      const unit = await AsyncStorage.getItem('isFahrenheit');
+      const useCur = await AsyncStorage.getItem('useCurrentLocation');
+      if (loc) setDefaultLocation(loc);
+      if (unit != null) setIsFahrenheit(JSON.parse(unit));
+      if (useCur != null) setUseCurrentLocation(JSON.parse(useCur));
+    } catch (e) {
+      console.error('Error loading settings:', e);
     }
   };
-  
 
   const saveSettings = async () => {
     try {
       await AsyncStorage.setItem('defaultLocation', defaultLocation);
       await AsyncStorage.setItem('isFahrenheit', JSON.stringify(isFahrenheit));
       await AsyncStorage.setItem('useCurrentLocation', JSON.stringify(useCurrentLocation));
-  
-      console.log('Saved Settings:', { defaultLocation, isFahrenheit, useCurrentLocation }); 
-  
-      Alert.alert('Instellingen opgeslagen!', 'De instellingen zijn succesvol opgeslagen.');
+      Alert.alert('Instellingen opgeslagen', 'Je instellingen zijn bijgewerkt.');
       navigation.navigate('Weather');
-    } catch (error) {
-      console.error('Fout bij opslaan instellingen', error);
+    } catch (e) {
+      console.error('Error saving settings:', e);
     }
   };
-  
 
   const fetchCurrentLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Toestemming geweigerd', 'Schakel locatietoegang in de instellingen in.');
+      Alert.alert('Toestemming geweigerd', 'Schakel locatietoegang in.');
       return;
     }
-
-    let location = await Location.getCurrentPositionAsync({});
-    const coords = `${location.coords.latitude},${location.coords.longitude}`;
-
     try {
-      const geoData = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+      let loc = await Location.getCurrentPositionAsync({});
+      const places = await Location.reverseGeocodeAsync({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
       });
-
-      if (geoData.length > 0) {
-        const { street, city, country, region, name } = geoData[0];
-        
-        let readableAddress = '';
-        if (street) {
-          readableAddress += street + ', ';
-        }
-        if (city) {
-          readableAddress += city + ', ';
-        }
-        if (region) {
-          readableAddress += region + ', ';
-        }
-        if (country) {
-          readableAddress += country;
-        }
-        setCurrentLocation(readableAddress || 'Locatie niet gevonden');
-      } else {
-        setCurrentLocation('Locatie niet gevonden');
+      if (places.length) {
+        const p = places[0];
+        setCurrentLocation(`${p.city}, ${p.country}`);
       }
-    } catch (error) {
-      console.error('Fout bij reverse geocoding', error);
-      setCurrentLocation('Fout bij het ophalen van locatie');
+    } catch (e) {
+      console.error('Error fetching current location:', e);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Instellingen</Text>
+      <Text style={styles.header}>Instellingen</Text>
 
-      <Text style={styles.defaultLocationText}>Huidige locatie: {currentLocation || 'Niet opgehaald'}</Text>
-
-      <View style={styles.switchContainer}>
-        <Text>Gebruik huidige locatie:</Text>
-        <Switch value={useCurrentLocation} onValueChange={setUseCurrentLocation} />
+      <View style={styles.section}>
+        <Text style={styles.label}>Gebruik huidige locatie</Text>
+        <Switch
+          value={useCurrentLocation}
+          onValueChange={setUseCurrentLocation}
+        />
       </View>
+
+      {useCurrentLocation && currentLocation !== '' && (
+        <View style={styles.section}>
+          <Text style={styles.label}>Huidige locatie</Text>
+          <Text style={styles.locationText}>{currentLocation}</Text>
+        </View>
+      )}
 
       {!useCurrentLocation && (
-        <>
-          <Text>Standaard locatie (stad, land):</Text>
+        <View style={styles.section}>
+          <Text style={styles.label}>Standaard locatie</Text>
           <TextInput
             style={styles.input}
+            placeholder="Bijv. Amsterdam, NL"
             value={defaultLocation}
             onChangeText={setDefaultLocation}
-            placeholder="Bijv. Amsterdam, NL"
           />
-        </>
+        </View>
       )}
-      <View style={styles.switchContainer}>
-          <Text>Gebruik Fahrenheit:</Text>
-          <Switch value={isFahrenheit} onValueChange={setIsFahrenheit} />
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Temperatuureenheid</Text>
+        <View style={styles.unitToggle}>
+          <Text style={styles.unitLabel}>°C</Text>
+          <Switch
+            value={isFahrenheit}
+            onValueChange={setIsFahrenheit}
+          />
+          <Text style={styles.unitLabel}>°F</Text>
+        </View>
       </View>
 
-      <Button title="Opslaan" onPress={saveSettings} backgroundColor="#007AFF" />
-
+      <TouchableOpacity style={styles.button} onPress={saveSettings}>
+        <Text style={styles.buttonText}>Opslaan</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -125,34 +128,70 @@ export default function SettingsPage({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F0F4FF',
     padding: 20,
     justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  header: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#007AFF',
     textAlign: 'center',
+    marginBottom: 30,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: 'white',
-    padding: 10,
-    marginVertical: 10,
-    borderRadius: 5,
-  },
-  switchContainer: {
+  section: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 10,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
-  defaultLocationText: {
-    marginTop: 20,
+  label: {
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    color: '#333',
+  },
+  input: {
+    flex: 1,
+    marginLeft: 10,
+    height: 40,
+    borderColor: '#CCC',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#FAFAFA',
+  },
+  unitToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  unitLabel: {
+    fontSize: 16,
+    marginHorizontal: 8,
+    color: '#333',
+  },
+  locationText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });
